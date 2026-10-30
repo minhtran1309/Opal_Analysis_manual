@@ -239,6 +239,10 @@ git config filter.strip-notebook-output.smudge cat
 
 Without it, outputs would be committed – clear them manually (*Edit → Clear All Outputs*) before committing.
 
+**Exception:** `tma_exploration.ipynb` is the manual, so it is committed *with* its outputs (figures and
+tables) so they can be read on GitHub (`tma_exploration.ipynb -filter` in `.gitattributes`). Re-run it
+completely before committing so the outputs match the code.
+
 ## Running the full pipeline
 
 Run the pipeline on all TMAs/assays:

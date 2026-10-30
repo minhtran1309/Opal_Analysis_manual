@@ -1,2 +1,4 @@
 # strip notebook outputs on commit (local copies keep them); see README "Contributing"
 *.ipynb filter=strip-notebook-output
+# exception: the manual notebook is published with its outputs (figures and tables)
+tma_exploration.ipynb -filter

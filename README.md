@@ -7,8 +7,35 @@ with scanpy / squidpy / AnnData.
 
 The project uses [uv](https://docs.astral.sh/uv/) with Python 3.12 (`pyproject.toml`, `uv.lock`, `.python-version`).
 
+### Install uv first
+
+> **Note:** uv is a separate tool and is often **not installed** – it doesn't come with Python,
+> Anaconda or macOS, and HPC systems such as Katana don't provide it as a module. Check first:
+>
+> ```bash
+> uv --version        # "command not found" → install it as below
+> ```
+
+Install it (no admin rights needed; it goes into `~/.local/bin`):
+
 ```bash
-cd Conver_cell_detection
+# macOS / Linux (including Katana)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.local/bin/env          # make uv available in this shell (or open a new terminal)
+uv --version
+```
+
+Alternatives: `brew install uv` (macOS with Homebrew), `pip install --user uv` (anywhere with Python),
+or on Windows (PowerShell): `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`.
+
+If `uv` is still "not found" after installing, `~/.local/bin` isn't on your `PATH`: run
+`source ~/.local/bin/env`, or add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc` / `~/.zshrc`.
+You don't need to install Python separately: uv downloads Python 3.12 for the project by itself.
+
+### Set up the project
+
+```bash
+cd Opal_Analysis_manual          # the cloned project folder
 
 # 1. create .venv and install the locked dependencies (including the dev group: jupyterlab, ipykernel)
 uv sync
@@ -25,6 +52,91 @@ Step 2 only needs to be repeated if `.venv` is deleted/recreated or the project 
 (the kernel stores the absolute path to `.venv/bin/python3`).
 
 Adding a package: `uv add <package>` (it is available in the notebooks after restarting the kernel).
+
+## Running on Katana (UNSW HPC)
+
+### 1. Log in
+```bash
+ssh -XYC <zID>@katana2.restech.unsw.edu.au      # e.g. z1234567@katana2.restech.unsw.edu.au
+```
+`-X`/`-Y` forward X11 so plot windows can open on your machine; `-C` compresses the connection
+(helps with X11 over slow links).
+
+### 2. Request an interactive compute session
+The login node is shared – don't run analyses on it. Request a compute node with one of these commands:
+
+```bash
+# 2 CPUs, 64 GB RAM, 2 h – one assay in the notebook, --qc-only runs
+qsub -IX -l select=1:ncpus=2:mem=64gb,walltime=2:00:00
+
+# 2 CPUs, 100 GB RAM, 8 h – full pipeline on all TMAs
+qsub -IX -l select=1:ncpus=2:mem=100gb,walltime=8:00:00
+
+# 2 CPUs, 1 GPU, 64 GB RAM, 9 h – GPU work (the current pipeline doesn't need a GPU)
+qsub -IX -l select=1:ncpus=2:ngpus=1:mem=64gb,walltime=9:00:00
+```
+
+`-I` = interactive, `-X` = X11 forwarding into the job, `select=1` = one node. Wait until the prompt
+moves to a compute node, then continue there. `exit` ends the session; `qstat -u $USER` lists your jobs.
+
+### 3. Install uv (once)
+uv is **not available on Katana by default** (there is no `uv` module), so `uv` gives
+"command not found" until you install it yourself. Check, and install if needed – it goes into your
+home directory, no admin rights or modules needed:
+
+```bash
+uv --version || curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.local/bin/env          # make uv available now (new logins pick it up automatically)
+uv --version
+```
+
+If `uv` is still not found in a later session or inside a `qsub` job, add
+`export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc`. See [Install uv first](#install-uv-first) for details.
+
+uv downloads Python 3.12 itself (from `.python-version`), so no Python module has to be loaded.
+If your home quota is tight, point uv's cache at your scratch space, e.g. add
+`export UV_CACHE_DIR=/srv/scratch/$USER/uv-cache` to `~/.bashrc`.
+
+### 4. Get the project and the data
+```bash
+git clone https://github.com/minhtran1309/Opal_Analysis_manual.git   # public: no login needed
+cd Opal_Analysis_manual
+uv sync                                                              # creates .venv
+```
+
+The data aren't in the repository. Copy the QuPath exports from your computer (run this **on your
+computer**, not on Katana):
+
+```bash
+rsync -avP Cell_dectection_results/ <zID>@katana2.restech.unsw.edu.au:Opal_Analysis_manual/Cell_dectection_results/
+```
+
+For large transfers, UNSW recommends Katana's data mover node; see the UNSW Research Technology
+Services documentation.
+
+### 5. Run the pipeline
+Inside the interactive session, from the project folder:
+
+```bash
+# fast QC loop: look at results/tma_pipeline/figures/qc_*.png, choose clip levels
+uv run python .claude/skills/analyzing-qupath-cells/scripts/run_pipeline.py \
+    "Cell_dectection_results/*_cell_detection_TMA*.txt" --out results/tma_pipeline --group-by Parent --qc-only
+
+# full run
+uv run python .claude/skills/analyzing-qupath-cells/scripts/run_pipeline.py \
+    "Cell_dectection_results/*_cell_detection_TMA*.txt" --out results/tma_pipeline --group-by Parent
+```
+
+The script draws no windows: figures go to `results/tma_pipeline/figures/` as PNG files. View them
+with an X11 image viewer (e.g. `display file.png`, if available) or copy them back with `rsync`/`scp`.
+
+To run the notebook without a browser (outputs are saved into the notebook file):
+
+```bash
+uv run python -m ipykernel install --user --name conver-cell-detection --display-name "Python (conver-cell-detection)"
+uv run jupyter nbconvert --to notebook --execute --inplace \
+    --ExecutePreprocessor.kernel_name=conver-cell-detection tma_exploration.ipynb
+```
 
 ## Running notebooks
 

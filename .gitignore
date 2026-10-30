@@ -1,0 +1,19 @@
+# environment
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+
+# data and outputs (not shared: tissue data, large files)
+Cell_dectection_results/
+results/
+*.h5ad
+
+# local notebooks not part of the manual
+Skin_1_analysis.ipynb
+0921_scRNA_IMC.ipynb
+tma_exploration_backup.ipynb
+
+# empty placeholders
+data_exploration.py
+pipeline*
